@@ -1,46 +1,27 @@
-
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <string.h>
 #include <sys/stat.h>
 
-struct msg {
-    int end;
-    char text[512];
-};
-
 int main() {
-    struct msg m;
-    char buf[512];
+    char msg[1000], result[1000];
+    int fd1, fd2;
 
     mkfifo("fifo1", 0666);
     mkfifo("fifo2", 0666);
 
-    int w = open("fifo1", O_WRONLY);
-    int r = open("fifo2", O_RDONLY);
+    printf("Enter sentences (type END to stop):\n");
 
-    while (1) {
-        printf("Enter sentence (exit to stop): ");
-        if (!fgets(m.text, sizeof(m.text), stdin))
-            break;
+    fd1 = open("fifo1", O_WRONLY);
+    fgets(msg, sizeof(msg), stdin);
+    write(fd1, msg, strlen(msg) + 1);
+    close(fd1);
 
-        m.end = !strcmp(m.text, "exit\n") ||
-                !strcmp(m.text, "exit");
+    fd2 = open("fifo2", O_RDONLY);
+    read(fd2, result, sizeof(result));
+    printf("\nResult from Receiver:\n%s", result);
+    close(fd2);
 
-        write(w, &m, sizeof(m));
-        if (m.end) break;
-    }
-
-    close(w);
-
-    int n;
-    while ((n = read(r, buf, sizeof(buf))) > 0)
-        write(1, buf, n);
-
-    close(r);
-    unlink("fifo1");
-    unlink("fifo2");
     return 0;
 }
