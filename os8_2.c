@@ -1,58 +1,44 @@
-
 #include <stdio.h>
-#include <string.h>
-#include <ctype.h>
 #include <fcntl.h>
 #include <unistd.h>
-
-struct msg {
-    int end;
-    char text[512];
-};
+#include <string.h>
+#include <ctype.h>
+#include <sys/stat.h>
 
 int main() {
-    struct msg m;
-    char buf[512], last = '\n';
-    int ch = 0, words = 0, lines = 0, inword = 0;
+    char msg[1000], result[1000];
+    int fd1, fd2, ch = 0, words = 0, lines = 0, inword = 0;
 
-    int r = open("fifo1", O_RDONLY);
-    int w = open("fifo2", O_WRONLY);
+    fd1 = open("fifo1", O_RDONLY);
+    read(fd1, msg, sizeof(msg));
+    close(fd1);
 
-    FILE *fp = fopen("result.txt", "w");
+    for (int i = 0; msg[i] != '\0'; i++) {
+        ch++;
 
-    while (read(r, &m, sizeof(m)) == sizeof(m)) {
-        if (m.end) break;
+        if (msg[i] == '\n')
+            lines++;
 
-        fprintf(fp, "%s", m.text);
-
-        for (int i = 0; m.text[i]; i++) {
-            char c = m.text[i];
-            ch++;
-            if (c == '\n') lines++;
-
-            if (isspace((unsigned char)c))
-                inword = 0;
-            else if (!inword) {
-                words++;
-                inword = 1;
-            }
-            last = c;
+        if (isspace(msg[i]))
+            inword = 0;
+        else if (!inword) {
+            words++;
+            inword = 1;
         }
     }
 
-    if (last != '\n' && ch > 0) lines++;
-
-    fprintf(fp, "\nCharacters: %d\nWords: %d\nLines: %d\n",
+    FILE *fp = fopen("result.txt", "w");
+    fprintf(fp, "Characters: %d\nWords: %d\nLines: %d\n",
             ch, words, lines);
     fclose(fp);
-    close(r);
 
     fp = fopen("result.txt", "r");
-    int n;
-    while ((n = fread(buf, 1, sizeof(buf), fp)) > 0)
-        write(w, buf, n);
-
+    fread(result, 1, sizeof(result) - 1, fp);
     fclose(fp);
-    close(w);
+
+    fd2 = open("fifo2", O_WRONLY);
+    write(fd2, result, strlen(result) + 1);
+    close(fd2);
+
     return 0;
 }
