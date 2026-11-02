@@ -1,90 +1,75 @@
-
 #!/bin/bash
 
-echo "Enter filename:"
-read filename
-
-while [ -z "$filename" ]
-do
-    echo "Filename cannot be empty. Enter filename:"
-    read filename
-done
+FILE="addressbook.txt"
 
 while true
 do
-    echo ""
-    echo "1. Create a File"
-    echo "2. Add data in File"
-    echo "3. Display content of file"
-    echo "4. Search a record"
-    echo "5. Delete a record"
-    echo "6. Modify record"
-    echo "7. Exit"
+    echo
+    echo "1. Create address book"
+    echo "2. View address book"
+    echo "3. Insert a record"
+    echo "4. Delete a record"
+    echo "5. Modify a record"
+    echo "6. Exit"
 
-    echo "Enter choice:"
-    read choice
+    read -p "Enter your choice: " ch
 
-    case $choice in
-
+    case $ch in
         1)
-            touch "$filename"
-            echo "File created."
+            > "$FILE"
+            echo "Address book created."
             ;;
 
         2)
-            echo "Enter emp id, empname and dept:"
-            read empid empname dept
-
-            if grep -q "^$empid " "$filename" 2>/dev/null; then
-                echo "Record with this ID already exists."
+            if [ -s "$FILE" ]; then
+                cat "$FILE"
             else
-                echo "$empid $empname $dept" >> "$filename"
-                echo "Record added."
+                echo "Address book is empty."
             fi
             ;;
 
         3)
-            echo "Content of file:"
-            cat "$filename"
+            read -p "Enter name: " name
+            read -p "Enter phone: " phone
+            read -p "Enter address: " address
+            echo "$name|$phone|$address" >> "$FILE"
+            echo "Record inserted."
             ;;
 
         4)
-            echo "Enter employee name to search:"
-            read name
-
-            echo "Search results:"
-            grep -i "$name" "$filename"
+            read -p "Enter name to delete: " name
+            if grep -q "^$name|" "$FILE" 2>/dev/null; then
+                grep -v "^$name|" "$FILE" > temp.txt
+                mv temp.txt "$FILE"
+                echo "Record deleted."
+            else
+                echo "Record not found."
+            fi
             ;;
 
         5)
-            echo "Enter employee name to delete:"
-            read name
+            read -p "Enter name to modify: " name
+            if grep -q "^$name|" "$FILE" 2>/dev/null; then
+                read -p "Enter new phone: " phone
+                read -p "Enter new address: " address
 
-            sed -i "/$name/d" "$filename"
-            echo "Record deleted."
+                awk -F'|' -v n="$name" -v p="$phone" -v a="$address" \
+                'BEGIN {OFS="|"} $1==n {$2=p; $3=a} {print}' "$FILE" > temp.txt
+
+                mv temp.txt "$FILE"
+                echo "Record modified."
+            else
+                echo "Record not found."
+            fi
             ;;
 
         6)
-            echo "Enter employee name to modify:"
-            read name
-
-            sed -i "/$name/d" "$filename"
-
-            echo "Enter new details (empid empname dept):"
-            read empid empname dept
-
-            echo "$empid $empname $dept" >> "$filename"
-            echo "Record modified."
-            ;;
-
-        7)
             echo "Exiting..."
-            break
+            exit
             ;;
 
         *)
             echo "Invalid choice."
             ;;
-
     esac
 done
