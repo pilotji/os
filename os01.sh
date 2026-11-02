@@ -12,7 +12,8 @@ do
     echo "3. Insert a Record"
     echo "4. Delete a Record"
     echo "5. Modify a Record"
-    echo "6. Exit"
+    echo "6. Search a Record"
+    echo "7. Exit"
     echo "=================================="
     read -p "Enter your choice: " ch
 
@@ -71,7 +72,18 @@ do
         fi
         ;;
 
-    6)
+        6)
+        read -p "Enter Name to Search: " name
+
+        if grep -q "^$name |" "$FILE" 2>/dev/null; then
+            echo "Record Found:"
+            grep "^$name |" "$FILE"
+        else
+            echo "Record Not Found!"
+        fi
+        ;;
+
+    7)
         echo "Exiting Address Book..."
         exit 0
         ;;
