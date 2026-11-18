@@ -1,67 +1,53 @@
+
 #include <stdio.h>
-#include <unistd.h>
-#include <pthread.h>
-#include <semaphore.h>
-
-#define SIZE 5
-#define ITEMS 10
-
-int buffer[SIZE];
-int in = 0, out = 0;
-
-sem_t empty;               /* counts empty slots */
-sem_t full;                /* counts filled slots */
-pthread_mutex_t mutex;     /* protects the buffer */
-
-void *producer(void *arg) {
-    int i;
-    for (i = 1; i <= ITEMS; i++) {
-        sem_wait(&empty);
-        pthread_mutex_lock(&mutex);
-
-        buffer[in] = i;
-        printf("Producer produced item %d at position %d\n", i, in);
-        in = (in + 1) % SIZE;
-
-        pthread_mutex_unlock(&mutex);
-        sem_post(&full);
-        sleep(1);
-    }
-    return NULL;
-}
-
-void *consumer(void *arg) {
-    int i, item;
-    for (i = 1; i <= ITEMS; i++) {
-        sem_wait(&full);
-        pthread_mutex_lock(&mutex);
-
-        item = buffer[out];
-        printf("Consumer consumed item %d from position %d\n", item, out);
-        out = (out + 1) % SIZE;
-
-        pthread_mutex_unlock(&mutex);
-        sem_post(&empty);
-        sleep(2);
-    }
-    return NULL;
-}
 
 int main() {
-    pthread_t p, c;
+    int n, m, i, j, k;
+    int alloc[10][10], max[10][10], need[10][10];
+    int avail[10], finish[10] = {0}, safe[10], count = 0;
 
-    sem_init(&empty, 0, SIZE);
-    sem_init(&full, 0, 0);
-    pthread_mutex_init(&mutex, NULL);
+    printf("Enter processes and resources: ");
+    scanf("%d%d", &n, &m);
 
-    pthread_create(&p, NULL, producer, NULL);
-    pthread_create(&c, NULL, consumer, NULL);
+    printf("Enter allocation matrix:\n");
+    for (i = 0; i < n; i++)
+        for (j = 0; j < m; j++)
+            scanf("%d", &alloc[i][j]);
 
-    pthread_join(p, NULL);
-    pthread_join(c, NULL);
+    printf("Enter maximum matrix:\n");
+    for (i = 0; i < n; i++)
+        for (j = 0; j < m; j++)
+            scanf("%d", &max[i][j]);
 
-    sem_destroy(&empty);
-    sem_destroy(&full);
-    pthread_mutex_destroy(&mutex);
+    printf("Enter available resources:\n");
+    for (j = 0; j < m; j++)
+        scanf("%d", &avail[j]);
+
+    for (i = 0; i < n; i++)
+        for (j = 0; j < m; j++)
+            need[i][j] = max[i][j] - alloc[i][j];
+
+    for (k = 0; k < n; k++)
+        for (i = 0; i < n; i++)
+            if (!finish[i]) {
+                for (j = 0; j < m; j++)
+                    if (need[i][j] > avail[j]) break;
+
+                if (j == m) {
+                    for (j = 0; j < m; j++)
+                        avail[j] += alloc[i][j];
+                    safe[count++] = i;
+                    finish[i] = 1;
+                }
+            }
+
+    if (count == n) {
+        printf("System is in safe state.\nSafe sequence: ");
+        for (i = 0; i < n; i++)
+            printf("P%d ", safe[i]);
+    } else
+        printf("System is in unsafe state.");
+
+    printf("\n");
     return 0;
 }
