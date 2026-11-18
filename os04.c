@@ -1,27 +1,29 @@
 
 #include <stdio.h>
-#include <unistd.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include <unistd.h>
 
-sem_t s;
-pthread_mutex_t m;
-int count = 0;
+sem_t room; 
+sem_t forks[5];
 
-void *worker(void *arg) {
-    int id = *(int *)arg;
+void *philosopher(void *arg) {
+    int i = *(int *)arg;
 
-    sem_wait(&s);
-    printf("Thread %d entered (semaphore acquired)\n", id);
+    printf("Philosopher %d is thinking.\n", i + 1);
 
-    pthread_mutex_lock(&m);
-    printf("Thread %d: Counter = %d\n", id, ++count);
-    pthread_mutex_unlock(&m);
+    sem_wait(&room);
+    sem_wait(&forks[i]);
+    sem_wait(&forks[(i + 1) % 5]);
 
+    printf("Philosopher %d picked up both forks and is eating.\n", i + 1);
     sleep(1);
-    printf("Thread %d leaving (semaphore released)\n", id);
-    sem_post(&s);
 
+    sem_post(&forks[(i + 1) % 5]);
+    sem_post(&forks[i]);
+    sem_post(&room);
+
+    printf("Philosopher %d finished eating and released both forks.\n", i + 1);
     return NULL;
 }
 
@@ -29,21 +31,22 @@ int main() {
     pthread_t t[5];
     int id[5];
 
-    sem_init(&s, 0, 2);
-    pthread_mutex_init(&m, NULL);
+    sem_init(&room, 0, 4);
 
     for (int i = 0; i < 5; i++) {
-        id[i] = i + 1;
-        pthread_create(&t[i], NULL, worker, &id[i]);
+        sem_init(&forks[i], 0, 1);
+        id[i] = i;
     }
+
+    for (int i = 0; i < 5; i++)
+        pthread_create(&t[i], NULL, philosopher, &id[i]);
 
     for (int i = 0; i < 5; i++)
         pthread_join(t[i], NULL);
 
-    printf("Final counter = %d\n", count);
+    for (int i = 0; i < 5; i++)
+        sem_destroy(&forks[i]);
 
-    sem_destroy(&s);
-    pthread_mutex_destroy(&m);
-
+    sem_destroy(&room);
     return 0;
 }
