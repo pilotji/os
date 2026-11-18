@@ -1,73 +1,175 @@
+
 #include <stdio.h>
-#include <stdlib.h>
 #include <unistd.h>
-#include <sys/wait.h>
+#include <pthread.h>
+#include <semaphore.h>
 
-void sort(int a[], int n, int asc) {
-    int i, j, t;
-    for(i=0; i<n; i++)
-        for(j=0; j<n-i-1; j++)
-            if((asc && a[j]>a[j+1]) || (!asc && a[j]<a[j+1])) {
-                t=a[j]; a[j]=a[j+1]; a[j+1]=t;
-            }
+#define SIZE 5
+#define ITEMS 10
+
+// ==========================================
+// PART 1: THREAD SYNCHRONIZATION
+// ==========================================
+
+sem_t s;
+pthread_mutex_t m;
+int count = 0;
+
+void *worker(void *arg) {
+    int id = *(int *)arg;
+
+    sem_wait(&s);
+
+    printf("Thread %d entered (semaphore acquired)\n", id);
+
+    pthread_mutex_lock(&m);
+
+    printf("Thread %d: Counter = %d\n", id, ++count);
+
+    pthread_mutex_unlock(&m);
+
+    sleep(1);
+
+    printf("Thread %d leaving (semaphore released)\n", id);
+
+    sem_post(&s);
+
+    return NULL;
 }
 
-void print(int a[], int n) {
-    for(int i=0; i<n; i++) printf("\t%d", a[i]);
-    printf("\n");
+void threadSync() {
+    pthread_t t[5];
+    int id[5];
+
+    sem_init(&s, 0, 2);
+    pthread_mutex_init(&m, NULL);
+
+    for (int i = 0; i < 5; i++) {
+        id[i] = i + 1;
+        pthread_create(&t[i], NULL, worker, &id[i]);
+    }
+
+    for (int i = 0; i < 5; i++)
+        pthread_join(t[i], NULL);
+
+    printf("\nFinal counter = %d\n", count);
+
+    sem_destroy(&s);
+    pthread_mutex_destroy(&m);
 }
+
+
+// ==========================================
+// PART 2: PRODUCER-CONSUMER PROBLEM
+// ==========================================
+
+int buffer[SIZE];
+int in = 0, out = 0;
+
+sem_t empty, full;
+pthread_mutex_t mutex;
+
+void *producer(void *arg) {
+    for (int i = 1; i <= ITEMS; i++) {
+
+        sem_wait(&empty);
+        pthread_mutex_lock(&mutex);
+
+        buffer[in] = i;
+
+        printf("Producer produced item %d at position %d\n",
+               i, in);
+
+        in = (in + 1) % SIZE;
+
+        pthread_mutex_unlock(&mutex);
+        sem_post(&full);
+
+        sleep(1);
+    }
+
+    return NULL;
+}
+
+void *consumer(void *arg) {
+    int item;
+
+    for (int i = 1; i <= ITEMS; i++) {
+
+        sem_wait(&full);
+        pthread_mutex_lock(&mutex);
+
+        item = buffer[out];
+
+        printf("Consumer consumed item %d from position %d\n",
+               item, out);
+
+        out = (out + 1) % SIZE;
+
+        pthread_mutex_unlock(&mutex);
+        sem_post(&empty);
+
+        sleep(2);
+    }
+
+    return NULL;
+}
+
+void producerConsumer() {
+    pthread_t p, c;
+
+    sem_init(&empty, 0, SIZE);
+    sem_init(&full, 0, 0);
+
+    pthread_mutex_init(&mutex, NULL);
+
+    pthread_create(&p, NULL, producer, NULL);
+    pthread_create(&c, NULL, consumer, NULL);
+
+    pthread_join(p, NULL);
+    pthread_join(c, NULL);
+
+    sem_destroy(&empty);
+    sem_destroy(&full);
+
+    pthread_mutex_destroy(&mutex);
+}
+
+
+// ==========================================
+// MAIN FUNCTION
+// ==========================================
 
 int main() {
-    int a[20], n, ch, i;
-    pid_t pid;
+    int ch;
 
-    printf("\nHOW MANY NOS DO YOU WANT IN ARRAY : ");
-    scanf("%d", &n);
-    if(n<1 || n>20) return 1;
+    printf("\n========== MENU ==========\n");
+    printf("1. Thread Synchronization\n");
+    printf("2. Producer-Consumer Problem\n");
+    printf("==========================\n");
 
-    printf("ENTER ARRAY ELEMENT : ");
-    for(i=0; i<n; i++) scanf("%d", &a[i]);
+    printf("Enter your choice: ");
 
-    printf("\n1. ZOMBIE PROCESS\n2. ORPHAN PROCESS\n");
-    printf("Enter choice: ");
-    scanf("%d", &ch);
-
-    if(ch!=1 && ch!=2) return 1;
-
-    pid=fork();
-
-    if(pid==0) {
-        if(ch==1) exit(0);
-
-        printf("\n###THIS IS AN ORPHAN STATE###\n");
-        sleep(5);
-        printf("\nCHILD PROCESS PID : %d", getpid());
-        printf("\nPARENT PROCESS PPID : %d\n", getppid());
-        system("ps -el | grep init");
-
-        printf("\n\nARRAY IN ASCENDING ORDER : ");
-        sort(a,n,1);
-        print(a,n);
+    if (scanf("%d", &ch) != 1 || ch < 1 || ch > 2) {
+        printf("Invalid choice!\n");
+        return 1;
     }
-    else if(pid>0) {
-        if(ch==1) {
-            printf("\n###THIS IS A ZOMBIE STATE###\n");
-            sleep(2);
-            system("ps -el | grep Z");
-            wait(NULL);
-            printf("\nTERMINATED CHILD PID : %d",pid);
-            printf("\nPARENT PID (MAIN) : %d",getpid());
-            printf("\nPARENTS PARENT PPID (BASH) : %d",getppid());
-            printf("\n\nARRAY IN DESCENDING ORDER : ");
-            sort(a,n,0);
-            print(a,n);
-        }
-        else {
-            printf("\nParent process is terminating...\n");
-            exit(0);
-        }
+
+    switch (ch) {
+
+        case 1:
+            printf("\n--- THREAD SYNCHRONIZATION ---\n");
+            threadSync();
+            break;
+
+        case 2:
+            printf("\n--- PRODUCER-CONSUMER PROBLEM ---\n");
+            producerConsumer();
+            break;
+
+        default:
+            printf("Invalid choice!\n");
     }
-    else printf("\nERROR IN FORK!!\n");
 
     return 0;
 }
